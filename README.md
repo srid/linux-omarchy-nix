@@ -96,7 +96,8 @@ Nothing is vendored here: the patches and the config come from the
     `pkgbuilds/linux-omarchy/` of the pinned input, in numeric-prefix order; that
     input's `config.x86_64`. `x86_64-linux` only. Not affiliated with Omarchy,
     Basecamp or Arch — this is Nix packaging of their PKGBUILD, nothing more.
-    Kernel GPL-2.0-only.
+    This packaging is MIT; the patches and config are MIT from `omarchy-pkgs`
+    (© David Heinemeier Hansson); the kernel itself is GPL-2.0-only.
 
 [^3]: `v4l2loopback` 0.15.4 runs `depmod` inside its own output (its Makefile
     delegates to the kernel's `modules_install`), which collides with the kernel's
