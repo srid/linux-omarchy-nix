@@ -1,39 +1,61 @@
 # linux-omarchy-nix
 
-Nix packaging of the [Omarchy](https://omarchy.org) kernel (`linux-omarchy`):
-kernel.org Linux **7.2.15** plus the ~188 patches and the kernel config from
-[`omacom/omarchy-pkgs`](https://github.com/omacom/omarchy-pkgs), applied at build
-time from a pinned flake input.
+**The Omarchy kernel, packaged for Nix.** Kernel.org Linux 7.2.15 plus the
+~188 patches and kernel config that [Omarchy](https://omarchy.org) ships, applied
+at build time from a pinned flake input.
 
-## Why use this instead of the NixOS kernel?
+If you are here, you probably have an Intel laptop from the last year or two and
+something on it does not work under a nixpkgs kernel.
 
-Nixpkgs ships mainline kernels with a nixpkgs config. On recent Intel laptops
-(Panther Lake / Lunar Lake class) that is not enough to drive the MIPI camera,
-and it misses a batch of platform fixes. On a Dell XPS 16 (DA16260) with an
-OV08X40 sensor behind a Synaptics SVP7500 USBIO i2c bridge, mainline **7.3.0**:
+## The camera that never turned on
 
-- enumerates the sensor and links it in the media graph, but the ISYS notifier
-  never binds it — the CVS bridge's `bound` callback creates the media link and
-  returns without registering subdev nodes — so the sensor gets **no
-  `/dev/v4l-subdev*` node**;
-- has no USBIO reset/resume handling for that bridge;
-- consequently the Intel camera HAL fails (`set format … failed` →
-  `VIDIOC_STREAMON: Broken pipe`) and apps see an empty `/dev/video*` loopback.
+A Dell XPS 16 with a Panther Lake chip. The webcam is detected — it shows up in
+the media graph, links are ENABLED, `/dev/video32` exists, every app happily opens
+it — and delivers nothing. The Intel camera HAL logs:
 
-Omarchy's tree carries exactly those fixes as patches — `0548
-media-cvs-sensor-node-in-bound-callback`, `0551 usbio-reset-resume-sabre`,
-`0541–0543` CVS/camera plumbing — plus Panther Lake display (i915/xe panel
-replay, PSR, FBC, bandwidth), audio (SOF/HDA quirks), Thunderbolt/USB4 (tunnel
-rescan, UCSI recovery), PCI/VMD, `btusb`/`btintel`, hwmon and ACPI fixes. Its
-config enables the whole camera stack: `CONFIG_VIDEO_INTEL_IPU7`,
-`CONFIG_IPU_BRIDGE`, `CONFIG_VIDEO_INTEL_CVS`, `CONFIG_VIDEO_OV08X40`,
-`CONFIG_I2C_USBIO`, `CONFIG_GPIO_USBIO`, `CONFIG_USB_USBIO`.
+```
+CamHAL[ERR] readlink sysName /sys/dev/char/0:0 failed ret -1
+CamHAL[ERR] MediaControl: set format ov08x40 4-0036 ... failed
+CamHAL[ERR] VIDIOC_STREAMON error: Broken pipe
+```
 
-Use it when you need those hardware fixes and can live with a slightly older
-kernel and an Arch-derived config. Otherwise stay on a nixpkgs kernel: newer
-mainline, nixpkgs' tested config, nixpkgs hardening.
+The cause is one missing line. The sensor sits behind an Intel CVS bridge, and
+when it binds, that bridge creates the media link and returns — it never registers
+subdev nodes. So the sensor never gets a `/dev/v4l-subdev*` node, and the HAL has
+nothing to open. Mainline 7.3 also has no USBIO reset/resume handling for the
+i2c bridge the sensor hangs off.
 
-## Usage
+Omarchy's tree carries both fixes.[^1] With this kernel the same machine boots
+and prints what you want to see:
+
+```
+kernel: intel_ipu7_isys … bind Intel CVS nlanes is 2 port is 0
+kernel: intel_ipu7_isys … All sensor registration completed.
+$ ls /dev/v4l-subdev*
+… /dev/v4l-subdev5  ov08x40 13-0036
+```
+
+That node is the whole ballgame.
+
+## Why not the NixOS kernel?
+
+Nixpkgs kernels are mainline with a nixpkgs config. That is the right default —
+newer source, tested config, nixpkgs hardening. This package trades those for a
+pile of hardware fixes that upstream has not merged yet:[^2]
+
+- **Cameras** on Panther Lake / Lunar Lake — the CVS sensor-node fix above, USBIO
+  reset/resume, CVS/ipu-bridge quirks.
+- **Displays** — i915/xe panel replay and PSR quirks for specific Dell panels,
+  FBC, Xe3 bandwidth, EDID fixes.
+- **Audio** — SOF/HDA quirks for machine-specific speaker and mic setups.
+- **Thunderbolt/USB4** — PCIe rescan after tunnel, UCSI recovery, xHCI fixes.
+- **Everything else** — btintel/btusb power-state races, PCI/VMD quirks, hwmon,
+  ACPI power resources.
+
+Use it when you need those. Stay on nixpkgs otherwise — this is a 7.2.x kernel
+with an Arch-derived config, not a newer one with nixpkgs'.
+
+## Use it
 
 ```nix
 {
@@ -46,39 +68,37 @@ mainline, nixpkgs' tested config, nixpkgs hardening.
 }
 ```
 
-`linuxPackagesFor` builds out-of-tree module packages (e.g. `v4l2loopback`) against
-it, which is what `services.v4l2-relayd` needs. Kernel changes only take effect
-after a reboot.
-
-## What it builds
-
-| | |
-|---|---|
-| Source | kernel.org `linux-7.2.15.tar.xz` |
-| Patches | every `*.patch` in `pkgbuilds/linux-omarchy/` of the pinned input (~188) |
-| Config | that input's `config.x86_64` |
-| Systems | `x86_64-linux` only |
+`linuxPackagesFor` rebuilds out-of-tree module packages against it, which is what
+`services.v4l2-relayd` needs. Reboot to run the new kernel. One NixOS papercut to
+know about.[^3]
 
 ## Updating
 
 ```sh
 just update   # bump omarchy-pkgs, read its pkgver, prefetch the tarball, rewrite sources.nix
-just status   # pinned input rev / input pkgver / version pinned in sources.nix
-just build    # build the kernel
+just status   # what is pinned
+just build
 ```
 
-The patch set and config are never vendored here — they come from the
+Nothing is vendored here: the patches and the config come from the
 `omarchy-pkgs` input, so `flake.lock` is the single pin.
 
-## Caveats
+---
 
-- Not affiliated with Omarchy, Basecamp or Arch. This is Nix packaging of their
-  PKGBUILD, nothing more.
-- Arch's kernel config, not nixpkgs': module signing, compression and BTF
-  settings differ from what NixOS users expect from `linuxPackages`.
-- `v4l2loopback` 0.15.4 runs `depmod` inside its own output (its Makefile
-  delegates to the kernel's `modules_install`), which collides with the kernel's
-  module tree when `boot.extraModulePackages` merges them; extend the package set
-  with `makeFlags = old.makeFlags ++ [ "DEPMOD=true" ]` if you hit it.
+[^1]: Patches `0548 media-cvs-sensor-node-in-bound-callback` (register subdev
+    nodes in the CVS `bound` callback) and `0551 usbio-reset-resume-sabre`
+    (gpio-usbio reset/resume), plus `0541–0543` for CVS/ipu-bridge plumbing. The
+    config enables `CONFIG_VIDEO_INTEL_IPU7`, `CONFIG_IPU_BRIDGE`,
+    `CONFIG_VIDEO_INTEL_CVS`, `CONFIG_VIDEO_OV08X40`, and the USBIO stack
+    (`CONFIG_I2C_USBIO`, `CONFIG_GPIO_USBIO`, `CONFIG_USB_USBIO`).
 
-Kernel: GPL-2.0-only. Patches and config: from `omacom/omarchy-pkgs`.
+[^2]: Source `linux-7.2.15.tar.xz` from kernel.org; every `*.patch` in
+    `pkgbuilds/linux-omarchy/` of the pinned input, in numeric-prefix order; that
+    input's `config.x86_64`. `x86_64-linux` only. Not affiliated with Omarchy,
+    Basecamp or Arch — this is Nix packaging of their PKGBUILD, nothing more.
+    Kernel GPL-2.0-only.
+
+[^3]: `v4l2loopback` 0.15.4 runs `depmod` inside its own output (its Makefile
+    delegates to the kernel's `modules_install`), which collides with the kernel's
+    module tree when `boot.extraModulePackages` merges them. If you hit it, extend
+    the package set with `makeFlags = old.makeFlags ++ [ "DEPMOD=true" ]`.
