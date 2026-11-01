@@ -55,6 +55,35 @@ pile of hardware fixes that upstream has not merged yet:[^2]
 Use it when you need those. Stay on nixpkgs otherwise — this is a 7.2.x kernel
 with an Arch-derived config, not a newer one with nixpkgs'.
 
+## What's in it
+
+188 patches from the pinned input,[^4] in groups:
+
+| Group | # | Examples |
+|---|---|---|
+| build | 2 | Arch base config, `-O3` kbuild |
+| schedulers | 9 | BORE 7.0, ADIOS 3.2, TLB pull, SMP preempt, hybrid-cluster balancing |
+| pm / mm / crypto | 15 | suspend fixes, zsmalloc, MGLRU, KSM, zstd dispatch, module signing |
+| filesystems | 13 | btrfs updates/fixes, FUSE perf and EOF handling, VFS |
+| display (drm) | 28 | i915/xe panel replay + PSR quirks (XPS 13/14/16), FBC, Xe3 bandwidth, AMD HDMI FRL |
+| sound | 22 | SOF/ASoC/HDA updates, per-machine quirks (XPS 13 SOF, ROG speakers, Behringer UMC) |
+| camera | 12 | CVS sensor-node fix, USBIO reset/resume, ipu-bridge quirks, ov08x40/imx471 |
+| input / hid | 10 | i2c touchpad, ASUS, magicmouse |
+| thunderbolt / usb | 10 | PCIe rescan after tunnel, xHCI fixes, UCSI recovery |
+| bt / wifi | 10 | btintel power-state races, btusb MT7922, brcmfmac |
+| pci / vmd / iommu | 13 | target-speed quirk, VMD quirks, AMD IOMMU perfopt |
+| hwmon | 11 | sensor updates and fixes |
+| platform / acpi | 33 | ACPI power resources, backlight, s2idle, AMD PMF |
+
+Exact list for the pinned input: `just patches`.
+
+## Upstream reading
+
+- Omarchy itself: <https://omarchy.org>
+- The PKGBUILD this wraps — patch files, `config.x86_64`, signatures:
+  <https://github.com/omacom/omarchy-pkgs/tree/master/pkgbuilds/linux-omarchy>
+- The packaging tree: <https://github.com/omacom/omarchy-pkgs>
+
 ## Use it
 
 ```nix
@@ -98,6 +127,10 @@ Nothing is vendored here: the patches and the config come from the
     Basecamp or Arch — this is Nix packaging of their PKGBUILD, nothing more.
     This packaging is MIT; the patches and config are MIT from `omarchy-pkgs`
     (© David Heinemeier Hansson); the kernel itself is GPL-2.0-only.
+
+[^4]: Group counts are from the pinned input; run `just patches` for the names.
+    Upstream keeps the same numeric prefixes, so the numbers are stable enough
+    to grep against their tree.
 
 [^3]: `v4l2loopback` 0.15.4 runs `depmod` inside its own output (its Makefile
     delegates to the kernel's `modules_install`), which collides with the kernel's

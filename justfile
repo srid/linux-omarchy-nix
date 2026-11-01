@@ -11,6 +11,13 @@ update:
 build:
     nix build .#linux-omarchy -L
 
+# List the patches in the pinned input.
+patches:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    src=$(nix eval --raw --impure --expr 'let f = builtins.getFlake (toString ./.); in f.inputs.omarchy-pkgs.outPath')
+    ls "$src/pkgbuilds/linux-omarchy"/*.patch | sed 's|.*/||'
+
 # What is pinned, and what the input's PKGBUILD says.
 status:
     #!/usr/bin/env bash
