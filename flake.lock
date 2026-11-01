@@ -1,0 +1,44 @@
+{
+  "nodes": {
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1793341285,
+        "narHash": "sha256-Y1CiZ4SoBUjLQyQM/pY+rS2dXD3CHLPstF0lmOc73D4=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "1c89083e451e891152365b799595cf7790a43325",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "omarchy-pkgs": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1793549721,
+        "narHash": "sha256-SHzOVlgGs3MhjGLejfgvwMvcu1/G80fJnQgQmS0ofq4=",
+        "owner": "omacom",
+        "repo": "omarchy-pkgs",
+        "rev": "626dbc88dcff1e53e78c8c6dacf8cc8fc899db40",
+        "type": "github"
+      },
+      "original": {
+        "owner": "omacom",
+        "repo": "omarchy-pkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "omarchy-pkgs": "omarchy-pkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
